@@ -1,0 +1,487 @@
+SkillCatalog.controller("catalogController", function(catalogService, $location,$modal, $scope, $routeParams, $rootScope, $timeout) {
+	console.log($routeParams);
+	$scope.getSkillSet = function() {
+		catalogService.getSkillSet (function(response) {
+			$scope.skills = response;
+			if(!_.isUndefined($routeParams.skill) && !_.isUndefined($routeParams.profId)) {
+					var selectedSkillSet = findSkillName(response,$routeParams.skill);
+					if(!_.isUndefined(selectedSkillSet)) {
+						$scope.byBaseSkill = selectedSkillSet.target_course_name;
+						$scope.selectedBaseSkill = selectedSkillSet;
+						
+					}
+					$scope.selectedBaseRating = $routeParams.profId;
+					$scope.showBaseSkillDp = true;
+					getBaseSkillSet();
+				
+			} else {
+				$scope.showBaseSkillDp = false;
+			}
+		});
+	}
+	
+	function getBaseSkillSet() {
+		var postObj = {
+				baseSkillId: $scope.selectedBaseSkill.tgt_course_id,
+				profId: parseInt($routeParams.profId),
+				deptId: 0
+			};
+			catalogService.getCourseByBase(postObj , function(response){
+				$scope.showTargetTable = false;$scope.showBaseTable = true;$scope.showBaseTarget = false;
+				if(response.length > 0){
+					$scope.showNoData = false;
+				} else {
+					$scope.showNoData = true;
+				}
+				$scope.baseCourseList = convertFormat(response);
+				$timeout(displayScroll(), 3000);
+			});
+	}
+	$scope.getSkillSet();
+	
+	
+	
+	function findSkillName(skillSet, skillName) {
+		var selectedSkillSet = {};
+		if(skillName.length > 0) {
+			angular.forEach(skillSet, function(value, key) {
+				if((value.target_course_name).toUpperCase() === (skillName.toUpperCase())){
+					selectedSkillSet = value;
+				}
+			});
+		}
+		return selectedSkillSet;
+	}
+	
+	
+	$("#byBaseSkill").addClass('selectedBtn');
+	$scope.selectedTab = "byBaseSkill";
+	$scope.showBaseSkill = true;
+	$scope.showNoData = true;
+	
+	
+	$scope.showPreReqSkill = false;
+	$scope.showBaseFtrBtn = false;
+	$scope.showFilterBtn = false;
+	$scope.showTargetTable = $scope.showBaseTarget = $scope.showBaseTable = $scope.showBaseTargetDP = false;
+	
+	$scope.searchSkill = function() {
+		$scope.showSkillList = true;
+		var searchValue = $scope.searchForm.byTargetSkill.$modelValue;
+		$scope.filteredList = getSkill(searchValue);
+	}
+	
+	$scope.selectedCourse = function(skill) {
+		$scope.selectedTargetSkill = skill;
+		$scope.byTargetSkill = skill.target_course_name;
+		$scope.showSkillList = false;
+		$scope.targetSkillPath();
+	}
+	
+	$scope.baseSkillSearch = function() {
+		$scope.baseSkillList = true;
+		var searchValue = $scope.searchForm.byBaseSkill.$modelValue;
+		$scope.baseSkillList = getSkill(searchValue);
+	}
+	
+	$scope.selectedBaseCourse = function(skill) {
+		$scope.selectedBaseSkill = skill;
+		$scope.byBaseSkill = skill.target_course_name;
+		$scope.baseSkillList = false;
+		$scope.showFilterBtn = true;
+		$scope.showDescription();
+	}
+	
+	$scope.baseTargetSearch = function() {
+		$scope.baseTarget = true;
+		var searchValue = $scope.searchForm.byBaseTarget.$modelValue;
+		if(searchValue.length > 0) {
+			$scope.baseTargetList = getSkill(searchValue);
+		} else {
+			$scope.baseTarget = false;
+			$scope.byBaseTarget = undefined;
+			$scope.showBaseSkillDp = true;
+		}		
+	}
+	
+	$scope.selectedTargetCourse = function(skill) {
+		$scope.selectedTgtSkill = skill;
+		$scope.byBaseTarget = skill.target_course_name;
+		$scope.baseTarget = $scope.showPreReqSkill = false;
+		$scope.showFilterBtn  = $scope.byBaseTarget.length > 0 ? true: false;
+		$scope.showBaseSkillDp = false;
+		//$scope.updatePreSkill();
+	}
+	
+	$scope.updatePreSkill = function() {
+		$scope.preReqcourse = $scope.selectedTgtSkill.prereq_course_name;
+		
+	}
+	
+	$scope.radioSelected = function(isSelected) {
+		if(!isSelected) $scope.byBaseTarget = undefined;
+		$scope.showBaseTargetDP = isSelected;		
+	}
+	$scope.targetSkillPath = function() {
+		catalogService.getTargetSkillPath($scope.selectedTargetSkill.tgt_course_id, function(response){
+			$scope.showTargetTable = true;$scope.showBaseTable = $scope.showBaseTarget = false;
+			if(response.length > 0){
+				$scope.showNoData = false;
+			} else {
+				$scope.showNoData = true;
+			}
+			var areaId = [], preCourseId = [], preCourseArry = [], skillArea = [];
+			/*angular.forEach(response, function(value, key) {
+				areaId.push({skillAreaId: value.prereq_skill_area_id, skillArea: value.prereq_skill_area});
+			});
+			var areaIdArry = _.uniq(areaId, function(x) {
+				return x.skillAreaId && x.skillArea;
+			});
+			console.log(areaIdArry)
+			angular.forEach(areaIdArry, function(value, key) {
+				var courseArry = [];
+				//console.log(value)
+				angular.forEach(response, function(row) {
+					if(value.skillAreaId == row.prereq_skill_area_id){
+						courseArry.push({preSkillId: value.skillAreaId, preSkillArea: value.skillArea, preCourseId: row.prereq_course_id, preCourseName: row.prereq_course_name});
+					}
+				});
+				console.log(courseArry);
+				//skillArea.push({preCourseId: value.preCourseId, preCourseName: value.preCourseName, link: linkArry, showIcon: (uniqPrecourse.length-1 == key) ? false: true });
+			});*/
+			
+			angular.forEach(response, function(value, key) {
+				preCourseId.push({preCourseId: value.prereq_course_id, preCourseName: value.prereq_course_name});
+			});
+			var uniqPrecourse = _.uniq(preCourseId, function(x) {
+				return x.preCourseId && x.preCourseName;
+			});
+			angular.forEach(uniqPrecourse, function(value, key) {
+				var linkArry = [];
+				angular.forEach(response, function(row) {
+					if(value.preCourseId == row.prereq_course_id){
+						linkArry.push({courseLink: row.course_link, courseLinkName: row.course_link_name, linkId: row.course_link_id, courseDur: row.course_dur});
+					}
+				});
+				preCourseArry.push({preCourseId: value.preCourseId, preCourseName: value.preCourseName, link: linkArry, showIcon: (uniqPrecourse.length-1 == key) ? false: true });
+			});
+			$scope.targetCourseList = preCourseArry;
+			
+		});
+	}
+	
+	$scope.openMail = function(courseDetails) {
+		window.location.href = 'mailto:DNACapability@hcl.com?subject=My Nomination for "'+ courseDetails.courseLinkName + '"&cc=Navaneetha.Kb@hcl.com; srikanth-n@hcl.com; radha.n@hcl.com&body=Hi Team,%0D%0A%0D%0A I would like to nominate myself for the "'+ courseDetails.courseLinkName +'" course. %0D%0A%0D%0A Thanks';
+	}
+	
+	function getSkill(searchValue) {
+		var list = [];
+		if(searchValue.length > 0) {
+			angular.forEach($scope.skills, function(value, key) {
+				if((value.target_course_name).toUpperCase().startsWith(searchValue.toUpperCase())){
+					list.push(value);
+				}
+			});
+		}
+		return list;
+	}
+	function displayScroll() {
+		$(".demo").customScrollbar();
+	}
+	$scope.applyFilter = function() {
+		$scope.submitted = true;
+		if($scope.filteForm.$valid) {
+			switch($scope.selectedTab) {
+			case "byBaseSkill":
+					var postObj = {
+						baseSkillId: JSON.parse($scope.filteForm.baseSkill.$modelValue).tgt_course_id,
+						profId: parseInt($scope.filteForm.rating.$modelValue),
+						deptId: $rootScope.deptId
+					};
+					catalogService.getCourseByBase(postObj , function(response){	
+						if(response.length > 0){
+							$scope.showNoData = false;
+						} else {
+							$scope.showNoData = true;
+						}
+						$scope.baseCourseList = convertFormat(response);
+						$timeout(displayScroll(), 3000);
+					});
+				
+					break;
+			case "byBaseTargetSkill":
+					catalogService.getCourseDetails(JSON.parse($scope.filteForm.baseSkill.$modelValue).tgt_course_id, JSON.parse($scope.filteForm.targetSkill.$modelValue).tgt_course_id, $scope.selectedTab, function(response){
+						if(response.length > 0){
+							$scope.showNoData = false;
+						} else {
+							$scope.showNoData = true;
+						}
+						var preCourseId = [], preCourseArry = [];
+						angular.forEach(response, function(value, key) {
+							preCourseId.push({courseId: value.course_id, depCourseName: value.dep_course_name});
+						});
+						var uniqPrecourse = _.uniq(preCourseId, function(x) {
+							return x.courseId && x.depCourseName;
+						});
+						angular.forEach(uniqPrecourse, function(value, key) {
+							var linkArry = [];
+							angular.forEach(response, function(row) {
+								if(value.courseId == row.course_id){
+									linkArry.push({courseLink: row.course_link, courseLinkName: row.course_link_name});
+								}
+							});
+							preCourseArry.push({courseId: value.courseId, depCourseName: value.depCourseName, link: linkArry, showIcon: (uniqPrecourse.length-1 == key) ? false: true});
+						});
+						//$scope.targetCourseList = preCourseArry;
+						$scope.baseTargetSkill = preCourseArry;
+						$timeout(displayScroll(), 3000);
+					});
+					break;
+			case "byTargetSkill":
+				console.log($scope.filteForm.targetSkill.$modelValue)
+					catalogService.getCourseDetails(null, JSON.parse($scope.filteForm.targetSkill.$modelValue).tgt_course_id, $scope.selectedTab, function(response){
+						if(response.length > 0){
+							$scope.showNoData = false;
+						} else {
+							$scope.showNoData = true;
+						}
+						var preCourseId = [], preCourseArry = [];
+						angular.forEach(response, function(value, key) {
+							preCourseId.push({preCourseId: value.prereq_course_id, preCourseName: value.prereq_course_name});
+						});
+						var uniqPrecourse = _.uniq(preCourseId, function(x) {
+							return x.preCourseId && x.preCourseName;
+						});
+						angular.forEach(uniqPrecourse, function(value, key) {
+							var linkArry = [];
+							angular.forEach(response, function(row) {
+								if(value.preCourseId == row.prereq_course_id){
+									linkArry.push({courseLink: row.course_link, courseLinkName: row.course_link_name});
+								}
+							});
+							preCourseArry.push({preCourseId: value.preCourseId, preCourseName: value.preCourseName, link: linkArry});
+						});
+						$scope.targetCourseList = preCourseArry;
+						$timeout(displayScroll(), 3000);
+						
+					});
+					break;
+				
+			}
+		}
+		
+		
+	}
+	
+	function convertFormat(response) {
+		var areaDetails = [],targetCourseArry = []; targetArry = [], finalList=[];
+		angular.forEach(response, function(value, key) {
+			areaDetails.push({skillAreaId: value.target_skill_area_id, skillAreaName: value.target_skill_area});
+		});
+		var uniqareaDetails = _.uniq(areaDetails, function(x) {
+			return x.skillAreaId && x.skillAreaName;
+		});
+		//console.log(uniqareaDetails, response);
+		angular.forEach(uniqareaDetails, function(value, key) {
+			var courseDetails = [];
+			angular.forEach(response, function(row, key) {
+				if(value.skillAreaId === row.target_skill_area_id) {
+					courseDetails.push({courseId: row.tgt_course_id, courseName: row.target_course_name, courseProfId: row.course_prof_id});
+				}
+			});
+			var rating = 1;
+			/*switch(value.courseProfId) {
+			case 1: rating = "Novice"; break;
+			case 2: rating = "Adv Beginner"; break;
+			case 3: rating = "Competent"; break;
+			case 4: rating = "Proficient"; break;
+			case 5: rating = "Expert"; break;
+			}*/
+			var uniqCourseArry = _.uniq(courseDetails, function(x) {
+				return x.targetCourseId && x.targetCourseName;
+			});
+			
+			targetArry.push({skillAreaId: value.skillAreaId, skillAreaName: value.skillAreaName, courseProfId: rating, courseDetails: uniqCourseArry})
+		});
+		//console.log(targetArry);
+		$scope.targetArry = targetArry;
+		angular.forEach($scope.targetArry, function(value1, i) {
+			 angular.forEach(value1.courseDetails, function(value, i) {
+				//console.log(value)
+				var linkArry = [];
+				angular.forEach(response, function(row, key) {
+					//console.log(value.courseId === row.tgt_course_id)
+					if(value.courseId === row.tgt_course_id) {
+						linkArry.push({courseDuration: row.course_dur, courseLink: row.course_link, courseLinkName: row.course_link_name, courseLinkId: row.course_link_id});
+					}
+				});	
+				$scope.targetArry
+			});
+			console.log(a)
+		});
+		//console.log(targetArry);
+		/*var uniqTargetArry = _.uniq(targetArry.targetArry, function(x) {
+			//return x.targetCourseId && x.targetCourseName;
+			console.log(x)
+		});*/
+		//console.log(uniqTargetArry);
+		/*angular.forEach(response, function(value, key) {
+			targetCourseArry.push({targetCourseId: value.tgt_course_id, targetCourseName: value.target_course_name, courseProfId: value.course_prof_id});
+		});
+		var uniqTargetCourse = _.uniq(targetCourseArry, function(x) {
+			return x.targetCourseId && x.targetCourseName;
+		});
+		console.log(uniqTargetCourse);
+		angular.forEach(uniqTargetCourse, function(value, key) {
+			var linkArry = [];
+			angular.forEach(response, function(row, key) {
+				if(value.targetCourseId === row.tgt_course_id) {
+					linkArry.push({courseDuration: row.course_dur, courseLink: row.course_link, courseLinkName: row.course_link_name});
+				}
+			});
+			var rating;
+			switch(value.courseProfId) {
+			case 1: rating = "Novice"; break;
+			case 2: rating = "Adv Beginner"; break;
+			case 3: rating = "Competent"; break;
+			case 4: rating = "Proficient"; break;
+			case 5: rating = "Expert"; break;
+			}
+			targetArry.push({targetCourseId: value.targetCourseId, targetCourseName: value.targetCourseName, courseProfId: rating, link: linkArry})
+		});*/
+		//console.log(targetArry)
+		return targetArry;
+	}
+	$scope.baseBtnSelected = function(btnId) {
+		$(".btn-class").removeClass('selectedBtn');
+		$("#"+btnId).addClass('selectedBtn');
+		$scope.selectedTab = btnId;
+		$scope.submitted = false;
+		$scope.showNoData = true;
+		$scope.baseCourseList = $scope.baseTargetSkill = $scope.targetCourseList = [];
+		switch(btnId) {
+				case "byBaseSkill":
+					$scope.showBaseSkill = true;$scope.showTargetSkill = false; $scope.showBaseTarget = false; $scope.showBaseSkillDp = true; $scope.showTargetSkillDp = false;
+					break;
+				case "byBaseTargetSkill":
+					$scope.showTargetSkill = false; $scope.showBaseSkill = false; $scope.showBaseTarget = true; $scope.showBaseSkillDp = true;$scope.showTargetSkillDp = true;
+						break;
+				case "byTargetSkill":
+					$scope.showTargetSkill = true; $scope.showBaseSkill = false; $scope.showBaseTarget = false;$scope.showBaseSkillDp = false;$scope.showTargetSkillDp = true;
+						break;
+		
+		}
+
+	}
+	
+	$scope.showDescription = function() {
+		$scope.preReqcourse = $scope.selectedBaseSkill.prereq_course_name;
+		$scope.showBaseSkillDp = true;
+	}
+
+	$scope.showPreReq = function() {
+		$scope.showPreReqSkill = true;
+		$scope.showFilterBtn = true;
+	}
+	
+	/*$scope.showFilterBtn = function() {
+		$scope.showBaseFtrBtn = true;
+	}*/
+	
+	$scope.showSkillPath = function() {
+		//console.log($scope.selectedBaseSkill, $scope.selectedTgtSkill.tgt_course_id);
+		if(!_.isUndefined($scope.searchForm.byBaseTarget) && !_.isUndefined($scope.searchForm.byBaseTarget.$modelValue)) {
+			var postObj = {baseSkillId: $scope.selectedBaseSkill.tgt_course_id, targetSkillId: $scope.selectedTgtSkill.tgt_course_id};
+			catalogService.getCourseByBaseTarget(postObj , function(response){
+				$scope.showTargetTable = false;$scope.showBaseTable = false; $scope.showBaseTarget = true;
+				if(response.length > 0){
+					$scope.showNoData = false;
+				} else {
+					$scope.showNoData = true;
+				}
+				var preCourseId = [], preCourseArry = [];
+				angular.forEach(response, function(value, key) {
+					preCourseId.push({courseId: value.course_id, depCourseName: value.dep_course_name});
+				});
+				var uniqPrecourse = _.uniq(preCourseId, function(x) {
+					return x.courseId && x.depCourseName;
+				});
+				angular.forEach(uniqPrecourse, function(value, key) {
+					var linkArry = [];
+					angular.forEach(response, function(row) {
+						if(value.courseId == row.course_id){
+							linkArry.push({courseLink: row.course_link, courseLinkName: row.course_link_name, courseDur: row.course_dur});
+						}
+					});
+					preCourseArry.push({courseId: value.courseId, depCourseName: value.depCourseName, link: linkArry, showIcon: (uniqPrecourse.length-1 == key) ? false: true});
+				});
+				//$scope.targetCourseList = preCourseArry;
+				$scope.baseTargetSkill = preCourseArry;
+			});
+		} else {
+			var postObj = {
+					baseSkillId: $scope.selectedBaseSkill.tgt_course_id,
+					profId: parseInt($scope.searchForm.baseRating.$modelValue),
+					deptId: ($scope.searchForm.preReqConfirm.$modelValue) ? $scope.selectedBaseSkill.prereq_course_id : 0
+				};
+				catalogService.getCourseByBase(postObj , function(response){
+					$scope.showTargetTable = false;$scope.showBaseTable = true;$scope.showBaseTarget = false;
+					if(response.length > 0){
+						$scope.showNoData = false;
+					} else {
+						$scope.showNoData = true;
+					}
+					$scope.baseCourseList = convertFormat(response);
+					$timeout(displayScroll(), 3000);
+				});
+		}
+		
+	}
+	$scope.showModal = function() {
+		var baseSkillObj = JSON.parse($scope.filteForm.baseSkill.$modelValue);
+		
+		if(baseSkillObj.prereq_course_id !== null && $scope.filteForm.rating.$modelValue !== undefined) {
+			$scope.baseSkillDetails = baseSkillObj;
+			var modalInstance = $modal.open({
+	            templateUrl : 'views/prompt.html',
+	            scope : $scope,
+	            controller: 'confirmSkillCntl' ,
+	        });
+		}
+	}
+	
+	$scope.logout = function() {
+		$location.path('/')
+	}
+	
+});
+
+SkillCatalog.controller("confirmSkillCntl", function ($modalInstance, $scope, $rootScope) {
+	$scope.confirmation = function(confirm) {
+		$rootScope.deptId = (confirm) ?  JSON.parse($scope.filteForm.baseSkill.$modelValue).prereq_course_id : 0;
+		$modalInstance.close();
+	}
+	
+	$scope.close = function(){
+		$modalInstance.close();
+	}	
+});
+
+SkillCatalog.controller("loginController", function ($scope, $location) {
+	$scope.login = function() {
+		$scope.submitted = true;
+		if($scope.loginForm.$valid) {
+			$location.path('/skillCatalog');
+		} else {
+			console.log("inValid form")
+		}
+	}
+});
+
+SkillCatalog.controller("dashboardController", function ($scope, $location) {
+	$scope.redirect = function() {
+		$location.path('/skillCatalog');
+	}
+});
+
+
